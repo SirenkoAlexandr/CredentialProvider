@@ -72,6 +72,7 @@ public:
 
 public:
 	void OnConnectStatusChanged();
+	void SetCredentials(wchar_t*, wchar_t*);
 
 protected:
 	CSampleProvider();

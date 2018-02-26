@@ -50,6 +50,13 @@ CSampleProvider::~CSampleProvider()
 	DllRelease();
 }
 
+void CSampleProvider::SetCredentials(wchar_t * username, wchar_t* password)
+{
+	_pCredential->CredentialsInitialize(username, password);
+}
+
+
+
 // This method acts as a callback for the hardware emulator. When it's called, it simply
 // tells the infrastructure that it needs to re-enumerate the credentials.
 void CSampleProvider::OnConnectStatusChanged()
@@ -107,10 +114,14 @@ HRESULT CSampleProvider::SetUsageScenario(
 						hr = _pCommandWindow->Initialize(this);
 						if (SUCCEEDED(hr))
 						{
+							//SetCredentials(L"Home", L"12345");
+							//_pCredential->CredentialsInitialize(L"Home", L"12345");
 							hr = _pCredential->Initialize(_cpus, s_rgCredProvFieldDescriptors, s_rgFieldStatePairs);
+							
+
 							if (SUCCEEDED(hr))
 							{
-								hr = _pMessageCredential->Initialize(s_rgMessageCredProvFieldDescriptors, s_rgMessageFieldStatePairs, L"Войти в режим бога");
+								hr = _pMessageCredential->Initialize(s_rgMessageCredProvFieldDescriptors, s_rgMessageFieldStatePairs,_pCredential->GetCredentials());
 							}
 						}
 					}

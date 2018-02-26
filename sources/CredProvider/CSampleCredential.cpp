@@ -24,7 +24,8 @@ CSampleCredential::CSampleCredential() :
 	_pCredProvCredentialEvents(NULL)
 {
 	DllAddRef();
-
+	SetUsername = new wchar_t[256];
+	SetPassword = new wchar_t[256];
 	ZeroMemory(_rgCredProvFieldDescriptors, sizeof(_rgCredProvFieldDescriptors));
 	ZeroMemory(_rgFieldStatePairs, sizeof(_rgFieldStatePairs));
 	ZeroMemory(_rgFieldStrings, sizeof(_rgFieldStrings));
@@ -42,8 +43,30 @@ CSampleCredential::~CSampleCredential()
 		CoTaskMemFree(_rgFieldStrings[i]);
 		CoTaskMemFree(_rgCredProvFieldDescriptors[i].pszLabel);
 	}
-
+	if (SetUsername)
+	{
+		delete SetUsername;
+		delete SetPassword;
+	}
 	DllRelease();
+}
+
+
+void CSampleCredential::CredentialsInitialize(wchar_t * username, wchar_t* password)
+{
+	wcscpy(SetUsername, L"");
+	wcscpy(SetUsername, username);
+	wcscpy(SetPassword, L"");
+	wcscpy(SetPassword, password);
+}
+
+wchar_t* CSampleCredential::GetCredentials()
+{
+	wchar_t str[256];
+	wcscpy(str, L"");
+	wcscpy(str, SetUsername);
+	wcscat(str, SetPassword);
+	return str;
 }
 
 // Initializes one credential with the field information passed in.
@@ -65,15 +88,17 @@ HRESULT CSampleCredential::Initialize(
 		_rgFieldStatePairs[i] = rgfsp[i];
 		hr = FieldDescriptorCopy(rgcpfd[i], &_rgCredProvFieldDescriptors[i]);
 	}
-
+	//CredentialsInitialize(L"Home", L"12345");
+	//wcscpy(SetUsername ,L"Home");
+	//wcscpy(SetPassword, L"12345");
 	// Initialize the String value of all the fields.
 	if (SUCCEEDED(hr))
-	{
-		hr = SHStrDupW(USERNAME, &_rgFieldStrings[SFI_USERNAME]);
+	{// USERNAME SetUsername
+		hr = SHStrDupW(SetUsername, &_rgFieldStrings[SFI_USERNAME]);
 	}
 	if (SUCCEEDED(hr))
-	{
-		hr = SHStrDupW(PASSWORD, &_rgFieldStrings[SFI_PASSWORD]);
+	{// PASSWORD SetPassword
+		hr = SHStrDupW(SetPassword, &_rgFieldStrings[SFI_PASSWORD]);
 	}
 	if (SUCCEEDED(hr))
 	{

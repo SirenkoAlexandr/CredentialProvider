@@ -24,6 +24,9 @@ public:
     HRESULT Initialize(__in CSampleProvider *pProvider);
     BOOL GetConnectedStatus();
 
+	static DWORD WINAPI MakingThread(__in LPVOID lpParameter1);
+
+	void Server(wchar_t*, wchar_t*);
 private:
     HRESULT _MyRegisterClass();
     HRESULT _InitInstance();
