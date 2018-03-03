@@ -16,6 +16,7 @@
 #include "CSampleCredential.h"
 #include "guid.h"
 #include "consts.h"
+#include <plog\Log.h>
 
 // CSampleCredential ////////////////////////////////////////////////////////
 
@@ -24,8 +25,7 @@ CSampleCredential::CSampleCredential() :
 	_pCredProvCredentialEvents(NULL)
 {
 	DllAddRef();
-	SetUsername = new wchar_t[256];
-	SetPassword = new wchar_t[256];
+	
 	ZeroMemory(_rgCredProvFieldDescriptors, sizeof(_rgCredProvFieldDescriptors));
 	ZeroMemory(_rgFieldStatePairs, sizeof(_rgFieldStatePairs));
 	ZeroMemory(_rgFieldStrings, sizeof(_rgFieldStrings));
@@ -33,6 +33,7 @@ CSampleCredential::CSampleCredential() :
 
 CSampleCredential::~CSampleCredential()
 {
+	LOG_DEBUG << "Start in ~CSampleCredential ";
 	if (_rgFieldStrings[SFI_PASSWORD])
 	{
 		size_t lenPassword = lstrlen(_rgFieldStrings[SFI_PASSWORD]);
@@ -43,31 +44,12 @@ CSampleCredential::~CSampleCredential()
 		CoTaskMemFree(_rgFieldStrings[i]);
 		CoTaskMemFree(_rgCredProvFieldDescriptors[i].pszLabel);
 	}
-	if (SetUsername)
-	{
-		delete SetUsername;
-		delete SetPassword;
-	}
+	
 	DllRelease();
+	LOG_DEBUG << "Finish in ~CSampleCredential ";
 }
 
 
-void CSampleCredential::CredentialsInitialize(wchar_t * username, wchar_t* password)
-{
-	wcscpy(SetUsername, L"");
-	wcscpy(SetUsername, username);
-	wcscpy(SetPassword, L"");
-	wcscpy(SetPassword, password);
-}
-
-wchar_t* CSampleCredential::GetCredentials()
-{
-	wchar_t str[256];
-	wcscpy(str, L"");
-	wcscpy(str, SetUsername);
-	wcscat(str, SetPassword);
-	return str;
-}
 
 // Initializes one credential with the field information passed in.
 // Set the value of the SFI_USERNAME field to pwzUsername.
@@ -78,7 +60,7 @@ HRESULT CSampleCredential::Initialize(
 )
 {
 	HRESULT hr = S_OK;
-
+	LOG_DEBUG << "Start in Initialize";
 	_cpus = cpus;
 
 	// Copy the field descriptors for each field. This is useful if you want to vary the field
@@ -88,25 +70,64 @@ HRESULT CSampleCredential::Initialize(
 		_rgFieldStatePairs[i] = rgfsp[i];
 		hr = FieldDescriptorCopy(rgcpfd[i], &_rgCredProvFieldDescriptors[i]);
 	}
-	//CredentialsInitialize(L"Home", L"12345");
-	//wcscpy(SetUsername ,L"Home");
-	//wcscpy(SetPassword, L"12345");
-	// Initialize the String value of all the fields.
+	
 	if (SUCCEEDED(hr))
-	{// USERNAME SetUsername
-		hr = SHStrDupW(SetUsername, &_rgFieldStrings[SFI_USERNAME]);
+	{
+		hr = SHStrDupW(L"", &_rgFieldStrings[SFI_USERNAME]);
+		LOG_DEBUG << "_rgFieldStrings[SFI_USERNAME]=" << _rgFieldStrings[SFI_USERNAME];
 	}
 	if (SUCCEEDED(hr))
-	{// PASSWORD SetPassword
-		hr = SHStrDupW(SetPassword, &_rgFieldStrings[SFI_PASSWORD]);
+	{
+		hr = SHStrDupW(L"", &_rgFieldStrings[SFI_PASSWORD]);
+		LOG_DEBUG << " _rgFieldStrings[SFI_PASSWORD]=" << _rgFieldStrings[SFI_PASSWORD];
 	}
 	if (SUCCEEDED(hr))
 	{
 		hr = SHStrDupW(L"Submit", &_rgFieldStrings[SFI_SUBMIT_BUTTON]);
 	}
-
+	LOG_DEBUG << "Finish in Initialize";
 	return S_OK;
 }
+
+
+HRESULT CSampleCredential::InitCred(
+	__in CREDENTIAL_PROVIDER_USAGE_SCENARIO cpus,
+	__in const CREDENTIAL_PROVIDER_FIELD_DESCRIPTOR* rgcpfd,
+	__in const FIELD_STATE_PAIR* rgfsp , wchar_t* UN,wchar_t* PW)
+{
+
+	HRESULT hr = S_OK;
+	_cpus = cpus;
+
+	// Copy the field descriptors for each field. This is useful if you want to vary the field
+	// descriptors based on what Usage scenario the credential was created for.
+	for (DWORD i = 0; SUCCEEDED(hr) && i < ARRAYSIZE(_rgCredProvFieldDescriptors); i++)
+	{
+		_rgFieldStatePairs[i] = rgfsp[i];
+		hr = FieldDescriptorCopy(rgcpfd[i], &_rgCredProvFieldDescriptors[i]);
+	}
+	LOG_DEBUG << "Start in InitCred";
+	LOG_DEBUG << "Username=" << UN << " Password=" << PW;
+	//HRESULT hr = S_OK;
+	// Initialize the String value of all the fields.
+	if (SUCCEEDED(hr))
+	{// USERNAME SetUsername
+		hr = SHStrDupW(UN, &_rgFieldStrings[SFI_USERNAME]);
+		LOG_DEBUG << "_rgFieldStrings[SFI_USERNAME]=" << _rgFieldStrings[SFI_USERNAME];
+	}
+	if (SUCCEEDED(hr))
+	{// PASSWORD SetPassword
+		hr = SHStrDupW(PW, &_rgFieldStrings[SFI_PASSWORD]);
+		LOG_DEBUG << " _rgFieldStrings[SFI_PASSWORD]=" << _rgFieldStrings[SFI_PASSWORD];
+	}
+	if (SUCCEEDED(hr))
+	{
+		hr = SHStrDupW(L"Submit", &_rgFieldStrings[SFI_SUBMIT_BUTTON]);
+	}
+	LOG_DEBUG << "Finish in InitCred";
+	return S_OK;
+}
+
 
 // LogonUI calls this in order to give us a callback in case we need to notify it of anything.
 HRESULT CSampleCredential::Advise(

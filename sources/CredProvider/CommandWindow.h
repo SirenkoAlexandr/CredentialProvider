@@ -27,6 +27,7 @@ public:
 	static DWORD WINAPI MakingThread(__in LPVOID lpParameter1);
 
 	void Server(wchar_t*, wchar_t*);
+
 private:
     HRESULT _MyRegisterClass();
     HRESULT _InitInstance();

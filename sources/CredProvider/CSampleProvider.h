@@ -72,8 +72,8 @@ public:
 
 public:
 	void OnConnectStatusChanged();
-	void SetCredentials(wchar_t*, wchar_t*);
-
+	CREDENTIAL_PROVIDER_USAGE_SCENARIO GetCPUS();
+	CSampleCredential * GetPCredential();
 protected:
 	CSampleProvider();
 	__override ~CSampleProvider();
@@ -81,10 +81,12 @@ protected:
 private:
 	CCommandWindow              *_pCommandWindow;       // Emulates external events.
 	LONG                        _cRef;                  // Reference counter.
-	CSampleCredential           *_pCredential;          // Our "connected" credential.
+	
 	CMessageCredential          *_pMessageCredential;   // Our "disconnected" credential.
 	ICredentialProviderEvents   *_pcpe;                    // Used to tell our owner to re-enumerate credentials.
 	UINT_PTR                    _upAdviseContext;       // Used to tell our owner who we are when asking to 
-														// re-enumerate credentials.
+
+	// re-enumerate credentials.
 	CREDENTIAL_PROVIDER_USAGE_SCENARIO      _cpus;
+	CSampleCredential           *_pCredential;          // Our "connected" credential.
 };

@@ -21,6 +21,10 @@
 #include "CommandWindow.h"
 #include "guid.h"
 
+#include <plog\Log.h>
+#include <fstream>
+#include <iostream>
+
 // CSampleProvider ////////////////////////////////////////////////////////
 
 CSampleProvider::CSampleProvider() :
@@ -32,6 +36,7 @@ CSampleProvider::CSampleProvider() :
 	_pCommandWindow = NULL;
 	_pCredential = NULL;
 	_pMessageCredential = NULL;
+
 }
 
 CSampleProvider::~CSampleProvider()
@@ -50,22 +55,29 @@ CSampleProvider::~CSampleProvider()
 	DllRelease();
 }
 
-void CSampleProvider::SetCredentials(wchar_t * username, wchar_t* password)
+CREDENTIAL_PROVIDER_USAGE_SCENARIO CSampleProvider::GetCPUS()
 {
-	_pCredential->CredentialsInitialize(username, password);
+	return this->_cpus;
 }
 
-
+CSampleCredential * CSampleProvider::GetPCredential()
+{
+	return this->_pCredential;
+}
 
 // This method acts as a callback for the hardware emulator. When it's called, it simply
 // tells the infrastructure that it needs to re-enumerate the credentials.
 void CSampleProvider::OnConnectStatusChanged()
 {
+	LOG_DEBUG << "Start in OnConnectStatusChanged";
 	if (_pcpe != NULL)
 	{
+		LOG_DEBUG << "pcpe != NULL";
 		_pcpe->CredentialsChanged(_upAdviseContext);
 	}
+	LOG_DEBUG << "Finish in OnConnectStatusChanged";
 }
+
 
 // SetUsageScenario is the provider's cue that it's going to be asked for tiles
 // in a subsequent call.
@@ -76,7 +88,8 @@ HRESULT CSampleProvider::SetUsageScenario(
 {
 	UNREFERENCED_PARAMETER(dwFlags);
 	HRESULT hr;
-
+	LOG_DEBUG << "Start in SetUsageScenario";
+	
 	// Decide which scenarios to support here. Returning E_NOTIMPL simply tells the caller
 	// that we're not designed for that scenario.
 	switch (cpus)
@@ -114,14 +127,11 @@ HRESULT CSampleProvider::SetUsageScenario(
 						hr = _pCommandWindow->Initialize(this);
 						if (SUCCEEDED(hr))
 						{
-							//SetCredentials(L"Home", L"12345");
-							//_pCredential->CredentialsInitialize(L"Home", L"12345");
-							hr = _pCredential->Initialize(_cpus, s_rgCredProvFieldDescriptors, s_rgFieldStatePairs);
 							
-
+							hr = _pCredential->InitCred(_cpus, s_rgCredProvFieldDescriptors, s_rgFieldStatePairs, L"", L"");
 							if (SUCCEEDED(hr))
 							{
-								hr = _pMessageCredential->Initialize(s_rgMessageCredProvFieldDescriptors, s_rgMessageFieldStatePairs,_pCredential->GetCredentials());
+								hr = _pMessageCredential->Initialize(s_rgMessageCredProvFieldDescriptors, s_rgMessageFieldStatePairs,L"");
 							}
 						}
 					}
@@ -175,7 +185,7 @@ HRESULT CSampleProvider::SetUsageScenario(
 		hr = E_INVALIDARG;
 		break;
 	}
-
+	LOG_DEBUG << "Finish in SetUsageScenario";
 	return hr;
 }
 
@@ -212,13 +222,16 @@ HRESULT CSampleProvider::Advise(
 	__in UINT_PTR upAdviseContext
 )
 {
+	LOG_DEBUG << "Start in Advice";
 	if (_pcpe != NULL)
 	{
+		LOG_DEBUG << "_pcpe != NULL";
 		_pcpe->Release();
 	}
 	_pcpe = pcpe;
 	_pcpe->AddRef();
 	_upAdviseContext = upAdviseContext;
+	LOG_DEBUG << "Finish in Advice";
 	return S_OK;
 }
 

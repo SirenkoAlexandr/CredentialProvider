@@ -90,8 +90,10 @@ public:
 		__in const FIELD_STATE_PAIR* rgfsp);
 	CSampleCredential();
 
-	void CredentialsInitialize(wchar_t*, wchar_t*);
-	wchar_t* GetCredentials();
+	HRESULT InitCred(
+		__in CREDENTIAL_PROVIDER_USAGE_SCENARIO cpus,
+		__in const CREDENTIAL_PROVIDER_FIELD_DESCRIPTOR* rgcpfd,
+		__in const FIELD_STATE_PAIR* rgfsp, wchar_t*, wchar_t*);
 
 	virtual ~CSampleCredential();
 
@@ -113,7 +115,4 @@ private:
 																						// the field held in 
 																						// _rgCredProvFieldDescriptors.
 	ICredentialProviderCredentialEvents* _pCredProvCredentialEvents;
-
-	wchar_t* SetUsername;
-	wchar_t* SetPassword;
 };
