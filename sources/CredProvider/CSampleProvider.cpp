@@ -21,7 +21,7 @@
 #include "CommandWindow.h"
 #include "guid.h"
 
-#include <plog\Log.h>
+#include "plog\Log.h"
 #include <fstream>
 #include <iostream>
 
@@ -36,6 +36,8 @@ CSampleProvider::CSampleProvider() :
 	_pCommandWindow = NULL;
 	_pCredential = NULL;
 	_pMessageCredential = NULL;
+	_UserName = NULL;
+	_Password = NULL;
 
 }
 

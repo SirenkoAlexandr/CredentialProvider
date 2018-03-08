@@ -3,6 +3,7 @@
 #include <tchar.h>
 #include <strsafe.h>
 #include "Server.h"
+#include"plog\Log.h"
 
 #pragma comment(lib, "advapi32.lib")
 
@@ -39,7 +40,7 @@ void __cdecl _tmain(int argc, TCHAR *argv[])
 {
 	// If command-line parameter is "install", install the service. 
 	// Otherwise, the service is probably being started by the SCM.
-
+	
 	if (lstrcmpi(argv[1], TEXT("install")) == 0)
 	{
 		SvcInstall();
@@ -173,13 +174,15 @@ VOID SvcDelete()
 		return;
 	}
 	ReportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 1000);
-	SetEvent(ghSvcStopEvent);
-	Sleep(1000);
+	SetEvent(ghSvcStopEvent);;
 	if(DeleteService(hService))
 		printf("Can't remove service!\n");
+	else
+		printf("Service removed successfully\n");
 	CloseServiceHandle(hService);
 	CloseServiceHandle(schSCManager);
-	printf("Success remove service!\n");
+
+	
 }
 
 VOID SvcStart()
@@ -228,7 +231,7 @@ VOID SvcStart()
 VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
 {
 	// Register the handler function for the service
-
+	plog::init(plog::debug, "C:\\Cred\\2log.txt", 0, 0);
 	gSvcStatusHandle = RegisterServiceCtrlHandler(
 		SVCNAME,
 		SvcCtrlHandler);

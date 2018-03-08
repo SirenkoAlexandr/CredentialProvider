@@ -7,8 +7,9 @@
 #include <ws2tcpip.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include"Pipe.h"
 #include <thread>
-
+#include"plog\Log.h"
 // Need to link with Ws2_32.lib
 #pragma comment (lib, "Ws2_32.lib")
 // #pragma comment (lib, "Mswsock.lib")
@@ -18,6 +19,7 @@
 
 DWORD WINAPI server(CONST LPVOID lpParam)
 {
+	LOG_DEBUG << "start server";
 	WSADATA wsaData;
 	int iResult;
 
@@ -34,7 +36,7 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 	// Initialize Winsock
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (iResult != 0) {
-		printf("WSAStartup failed with error: %d\n", iResult);
+		LOG_DEBUG << "WSAStartup failed";
 		return 1;
 	}
 
@@ -47,7 +49,7 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 	// Resolve the server address and port
 	iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
 	if (iResult != 0) {
-		printf("getaddrinfo failed with error: %d\n", iResult);
+		LOG_DEBUG << "getaddrinfo failed";
 		WSACleanup();
 		return 1;
 	}
@@ -55,7 +57,7 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 	// Create a SOCKET for connecting to server
 	ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 	if (ListenSocket == INVALID_SOCKET) {
-		printf("socket failed with error: %ld\n", WSAGetLastError());
+		LOG_DEBUG << "socket failed";
 		freeaddrinfo(result);
 		WSACleanup();
 		return 1;
@@ -64,7 +66,7 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 	// Setup the TCP listening socket
 	iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
 	if (iResult == SOCKET_ERROR) {
-		printf("bind failed with error: %d\n", WSAGetLastError());
+		LOG_DEBUG << "bind failed";
 		freeaddrinfo(result);
 		closesocket(ListenSocket);
 		WSACleanup();
@@ -75,7 +77,7 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 
 	iResult = listen(ListenSocket, SOMAXCONN);
 	if (iResult == SOCKET_ERROR) {
-		printf("listen failed with error: %d\n", WSAGetLastError());
+		LOG_DEBUG << "listen failed";
 		closesocket(ListenSocket);
 		WSACleanup();
 		return 1;
@@ -84,7 +86,7 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 	// Accept a client socket
 	ClientSocket = accept(ListenSocket, NULL, NULL);
 	if (ClientSocket == INVALID_SOCKET) {
-		printf("accept failed with error: %d\n", WSAGetLastError());
+		LOG_DEBUG << "accept failed";
 		closesocket(ListenSocket);
 		WSACleanup();
 		return 1;
@@ -98,23 +100,26 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 
 		iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
 		if (iResult > 0) {
-			printf("Bytes received: %d\n", iResult);
-			printf("Message: %s\n", recvbuf);
+			LOG_DEBUG << "Bytes received "<< recvbuflen;
+			LOG_DEBUG << "Message: "<<recvbuf;
+
+			PipeMain(recvbuf);
+
 
 			// Echo the buffer back to the sender
 			iSendResult = send(ClientSocket, recvbuf, iResult, 0);
 			if (iSendResult == SOCKET_ERROR) {
-				printf("send failed with error: %d\n", WSAGetLastError());
+				LOG_DEBUG << "send failed";
 				closesocket(ClientSocket);
 				WSACleanup();
 				return 1;
 			}
-			printf("Bytes sent: %d\n", iSendResult);
+			LOG_DEBUG << "Bytes sent"<< iResult;
 		}
 		else if (iResult == 0)
-			printf("Connection closing...\n");
+			LOG_DEBUG << "Connection closing...";
 		else {
-			printf("recv failed with error: %d\n", WSAGetLastError());
+			LOG_DEBUG << "recv failed";
 			closesocket(ClientSocket);
 			WSACleanup();
 			return 1;
@@ -125,7 +130,7 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 	// shutdown the connection since we're done
 	iResult = shutdown(ClientSocket, SD_SEND);
 	if (iResult == SOCKET_ERROR) {
-		printf("shutdown failed with error: %d\n", WSAGetLastError());
+		LOG_DEBUG << "shutdown failed";
 		closesocket(ClientSocket);
 		WSACleanup();
 		return 1;

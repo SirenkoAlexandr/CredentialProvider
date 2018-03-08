@@ -16,7 +16,7 @@
 #include "CSampleCredential.h"
 #include "guid.h"
 #include "consts.h"
-#include <plog\Log.h>
+#include "plog\Log.h"
 
 // CSampleCredential ////////////////////////////////////////////////////////
 
