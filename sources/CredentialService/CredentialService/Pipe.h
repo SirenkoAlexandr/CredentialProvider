@@ -9,8 +9,9 @@
 
 int PipeMain(char *message)
 {
+	//char *message = (char*)Param;
 	HANDLE hPipe;
-	LPTSTR lpvMessage = (LPTSTR)message;
+	LPTSTR lpvMessage =(LPTSTR)message;
 	TCHAR  chBuf[BUFSIZE];
 	BOOL   fSuccess = FALSE;
 	DWORD  cbRead, cbToWrite, cbWritten, dwMode;
@@ -41,7 +42,7 @@ int PipeMain(char *message)
 		if (GetLastError() != ERROR_PIPE_BUSY)
 		{
 			LOG_DEBUG << "Could not open pipe.";
-			return -1;
+			return 0;
 		}
 
 		// All pipe instances are busy, so wait for 1 second. 
@@ -49,7 +50,7 @@ int PipeMain(char *message)
 		if (!WaitNamedPipe(lpszPipename, 2000))
 		{
 			LOG_DEBUG << "Could not open pipe: 2 second wait timed out.";
-			return -1;
+			return 0;
 		}
 	}
 
@@ -64,7 +65,7 @@ int PipeMain(char *message)
 	if (!fSuccess)
 	{
 		LOG_DEBUG << "SetNamedPipeHandleState failed.";
-		return -1;
+		return 0;
 	}
 
 	// Send a message to the pipe server. 
@@ -82,7 +83,7 @@ int PipeMain(char *message)
 	if (!fSuccess)
 	{
 		LOG_DEBUG << "WriteFile to pipe failed.";
-		return -1;
+		return 0;
 	}
 
 	LOG_DEBUG << "Message "<< lpvMessage <<" sent to server. Simbols ="<< cbToWrite;
@@ -107,12 +108,12 @@ int PipeMain(char *message)
 	if (!fSuccess)
 	{
 		LOG_DEBUG << "ReadFile from pipe failed.";
-		return -1;
+		return 0;
 	}
 
 	LOG_DEBUG << "Message sended";
 
 	CloseHandle(hPipe);
 	LOG_DEBUG << "Close Pipe";
-	return 0;
+	return 1;
 }

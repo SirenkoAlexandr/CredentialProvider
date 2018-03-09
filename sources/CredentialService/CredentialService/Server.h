@@ -17,6 +17,13 @@
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "27015"
 
+DWORD WINAPI InstanceServer(void* socet);
+
+struct SocketTransport
+{
+	SOCKET socket;
+};
+
 DWORD WINAPI server(CONST LPVOID lpParam)
 {
 	LOG_DEBUG << "start server";
@@ -29,9 +36,9 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 	struct addrinfo *result = NULL;
 	struct addrinfo hints;
 
-	int iSendResult;
+	/*int iSendResult;
 	char recvbuf[DEFAULT_BUFLEN];
-	int recvbuflen = DEFAULT_BUFLEN;
+	int recvbuflen = DEFAULT_BUFLEN;*/
 
 	// Initialize Winsock
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -75,57 +82,43 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 
 	freeaddrinfo(result);
 
+	LOG_DEBUG << "listing";
 	iResult = listen(ListenSocket, SOMAXCONN);
-	if (iResult == SOCKET_ERROR) {
+	if (iResult == SOCKET_ERROR)
+	{
 		LOG_DEBUG << "listen failed";
 		closesocket(ListenSocket);
 		WSACleanup();
 		return 1;
 	}
 
-	// Accept a client socket
-	ClientSocket = accept(ListenSocket, NULL, NULL);
-	if (ClientSocket == INVALID_SOCKET) {
-		LOG_DEBUG << "accept failed";
-		closesocket(ListenSocket);
-		WSACleanup();
-		return 1;
-	}
 
-	// No longer need server socket
-	closesocket(ListenSocket);
-
-	// Receive until the peer shuts down the connection
-	do {
-
-		iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
-		if (iResult > 0) {
-			LOG_DEBUG << "Bytes received "<< recvbuflen;
-			LOG_DEBUG << "Message: "<<recvbuf;
-
-			PipeMain(recvbuf);
-
-
-			// Echo the buffer back to the sender
-			iSendResult = send(ClientSocket, recvbuf, iResult, 0);
-			if (iSendResult == SOCKET_ERROR) {
-				LOG_DEBUG << "send failed";
-				closesocket(ClientSocket);
-				WSACleanup();
-				return 1;
-			}
-			LOG_DEBUG << "Bytes sent"<< iResult;
-		}
-		else if (iResult == 0)
-			LOG_DEBUG << "Connection closing...";
-		else {
-			LOG_DEBUG << "recv failed";
+	for (;;)
+	{
+		
+		LOG_DEBUG << "accepting";
+		// Accept a client socket
+		ClientSocket = accept(ListenSocket, NULL, NULL);
+		LOG_DEBUG << "new ClientSocket =" << ClientSocket;
+		SocketTransport *trans=new SocketTransport;
+		trans->socket = ClientSocket;
+ 		if (ClientSocket == INVALID_SOCKET)
+		{
+			LOG_DEBUG << "accept failed";
+			closesocket(ListenSocket);
 			closesocket(ClientSocket);
 			WSACleanup();
 			return 1;
 		}
+		LOG_DEBUG << "try create InstantServer";
+		HANDLE hThreadPipe = CreateThread(NULL, 0, InstanceServer, trans, 0, NULL);
 
-	} while (iResult > 0);
+	}
+	// No longer need server socket
+	//closesocket(ListenSocket);
+
+	// Receive until the peer shuts down the connection
+	
 
 	// shutdown the connection since we're done
 	iResult = shutdown(ClientSocket, SD_SEND);
@@ -142,4 +135,64 @@ DWORD WINAPI server(CONST LPVOID lpParam)
 	return 0;
 }
 
+	DWORD WINAPI InstanceServer(void* param)
+	{
+		SocketTransport *trans=(SocketTransport*)param;
+		int iSendResult;
+		char recvbuf[DEFAULT_BUFLEN];
+		int recvbuflen = DEFAULT_BUFLEN;
+		int iResult;
+		
+		SOCKET ClientSocket = trans->socket;
+		LOG_DEBUG << "start new instantServer with SOCKET ="<<ClientSocket;
+
+		do {
+
+			iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+			if (iResult > 0) 
+			{
+				LOG_DEBUG << "Bytes received " << recvbuflen;
+				LOG_DEBUG << "Message: " << recvbuf;
+
+
+
+				if (!PipeMain(recvbuf))
+				{
+					LOG_DEBUG << "Connection Error";
+					strcpy_s(recvbuf, strlen("Connection Error")+1,"Connection Error");
+				}
+				else
+				{
+					LOG_DEBUG << "Authorisation is successfully";
+					strcpy_s(recvbuf, strlen("Authorisation is successfully") + 1, "Authorisation is successfully");
+				}
+				
+
+				LOG_DEBUG << "Send answer :" << recvbuf;
+				// Echo the buffer back to the sender
+				iSendResult = send(ClientSocket, recvbuf, strlen(recvbuf), 0);
+				if (iSendResult == SOCKET_ERROR) 
+				{
+					LOG_DEBUG << "send failed";
+					closesocket(ClientSocket);
+					WSACleanup();
+					return 1;
+				}
+				LOG_DEBUG << "Bytes sent" << strlen(recvbuf);
+			}
+			else if (iResult == 0)
+			{
+				closesocket(ClientSocket);
+				LOG_DEBUG << "Connection closing...";
+			}
+			else {
+				LOG_DEBUG << "recv failed";
+				closesocket(ClientSocket);
+				WSACleanup();
+				return 1;
+			}
+
+		} while (iResult > 0);
+		return 0;
+	}
 
