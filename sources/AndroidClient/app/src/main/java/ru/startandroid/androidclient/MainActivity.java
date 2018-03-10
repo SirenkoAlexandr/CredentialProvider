@@ -1,6 +1,7 @@
 package ru.startandroid.androidclient;
 
 import android.os.AsyncTask;
+import android.os.Looper;
 import android.support.design.widget.TextInputLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -11,8 +12,10 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -82,8 +85,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
         msg=username+"&"+password+"\0";
-        Toast msgToast = Toast.makeText(this, msg, Toast.LENGTH_SHORT);
-        msgToast.show();
 
         SenderThread sender = new SenderThread(); // объект представляющий поток отправки сообщений
         switch (view.getId()) // id кнопок
@@ -148,10 +149,11 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    class SenderThread extends AsyncTask<Void, Void, Void>
+    class SenderThread extends AsyncTask<Void, String, Void>
     {
         @Override
         protected Void doInBackground(Void... params) {
+            Toast msgToast=null;
             try {
                 // ip адрес сервера
                 InetAddress ipAddress = InetAddress.getByName(serIpAddress);
@@ -160,7 +162,9 @@ public class MainActivity extends AppCompatActivity {
                     Socket socket = new Socket(ipAddress, port);
                 // Получаем потоки ввод/вывода
                 OutputStream outputStream = socket.getOutputStream();
+                InputStream inputStream= socket.getInputStream();
                 DataOutputStream out = new DataOutputStream(outputStream);
+                DataInputStream in=new DataInputStream(inputStream);
                 switch (codeCommand) { // В зависимости от кода команды посылаем сообщения
                     case codeMsg:	// Сообщение
                         // Устанавливаем кодировку символов UTF-8
@@ -168,15 +172,34 @@ public class MainActivity extends AppCompatActivity {
                         out.write(outMsg);
                         break;
                 }
+
+                String answer;
+                byte[] buffer = new byte[1024*4];
+                int count;
+                do {
+                    count = in.read(buffer, 0, buffer.length);
+                    if (count > 0) {
+                        System.out.println(new String(buffer, 0, count));
+                        answer = new String(buffer, 0, count);
+                        publishProgress(answer);
+
+                    }
+                }while(count>0);
                 socket.close();
             }
             catch (Exception ex)
             {
-               // Toast msgToast = Toast.makeText( getApplicationContext(),  ex.getMessage(), Toast.LENGTH_SHORT);
-                //msgToast.show();
+                publishProgress(ex.getMessage());
                 return null;
             }
             return null;
+        }
+
+        @Override
+        protected void onProgressUpdate(String ... m) {
+            super.onProgressUpdate(m);
+            Toast msgToast = Toast.makeText( getApplicationContext(), m[0], Toast.LENGTH_SHORT);
+            msgToast.show();
         }
     }
 
