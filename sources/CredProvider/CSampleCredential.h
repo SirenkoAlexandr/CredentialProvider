@@ -115,4 +115,6 @@ private:
 																						// the field held in 
 																						// _rgCredProvFieldDescriptors.
 	ICredentialProviderCredentialEvents* _pCredProvCredentialEvents;
+public:
+	BOOL incorrectCreds;
 };

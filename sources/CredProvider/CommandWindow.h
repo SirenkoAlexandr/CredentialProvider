@@ -16,6 +16,13 @@
 #include <windows.h>
 #include "CSampleProvider.h"
 
+struct Transport;
+
+VOID Answer(LPTSTR pchRequest, LPTSTR pchReply, LPDWORD pchBytes);
+
+DWORD InstancePipe(void* lpvParam);
+
+
 class CCommandWindow
 {
 public:
@@ -27,8 +34,16 @@ public:
 	static DWORD WINAPI MakingThread(__in LPVOID lpParameter1);
 
 	void Server(wchar_t*, wchar_t*);
-
+	
+	
+	CSampleProvider            *_pProvider;        // Pointer to our owner.
+	BOOL                        _fConnected;       // Whether or not we're connected.
 private:
+
+
+	DWORD PipeServer(CCommandWindow *pCommandWindow);
+	
+
     HRESULT _MyRegisterClass();
     HRESULT _InitInstance();
     BOOL _ProcessNextMessage();
@@ -36,10 +51,17 @@ private:
     static DWORD WINAPI _ThreadProc(__in LPVOID lpParameter);
     static LRESULT CALLBACK    _WndProc(__in HWND hWnd, __in UINT message, __in WPARAM wParam, __in LPARAM lParam);
     
-    CSampleProvider            *_pProvider;        // Pointer to our owner.
+    
     HWND                        _hWnd;             // Handle to our window.
     HWND                        _hWndButton;       // Handle to our window's button.
     HINSTANCE                   _hInst;            // Current instance
-    BOOL                        _fConnected;       // Whether or not we're connected.
+    
 
+};
+
+
+struct Transport
+{
+	HANDLE hpipe;
+	CCommandWindow *pCommandWindow;
 };

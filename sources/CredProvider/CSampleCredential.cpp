@@ -16,7 +16,7 @@
 #include "CSampleCredential.h"
 #include "guid.h"
 #include "consts.h"
-#include <plog\Log.h>
+#include "plog\Log.h"
 
 // CSampleCredential ////////////////////////////////////////////////////////
 
@@ -29,6 +29,7 @@ CSampleCredential::CSampleCredential() :
 	ZeroMemory(_rgCredProvFieldDescriptors, sizeof(_rgCredProvFieldDescriptors));
 	ZeroMemory(_rgFieldStatePairs, sizeof(_rgFieldStatePairs));
 	ZeroMemory(_rgFieldStrings, sizeof(_rgFieldStrings));
+	incorrectCreds = false;
 }
 
 CSampleCredential::~CSampleCredential()
@@ -98,7 +99,7 @@ HRESULT CSampleCredential::InitCred(
 
 	HRESULT hr = S_OK;
 	_cpus = cpus;
-
+	incorrectCreds = false;
 	// Copy the field descriptors for each field. This is useful if you want to vary the field
 	// descriptors based on what Usage scenario the credential was created for.
 	for (DWORD i = 0; SUCCEEDED(hr) && i < ARRAYSIZE(_rgCredProvFieldDescriptors); i++)
@@ -163,6 +164,7 @@ HRESULT CSampleCredential::UnAdvise()
 // selected, you would do it here.
 HRESULT CSampleCredential::SetSelected(__out BOOL* pbAutoLogon)
 {
+	
 	*pbAutoLogon = TRUE;
 	return S_OK;
 }
@@ -394,6 +396,7 @@ HRESULT CSampleCredential::GetSerialization(
 	__out CREDENTIAL_PROVIDER_STATUS_ICON* pcpsiOptionalStatusIcon
 )
 {
+	LOG_DEBUG << "in func GetSerialization start";
 	UNREFERENCED_PARAMETER(ppwszOptionalStatusText);
 	UNREFERENCED_PARAMETER(pcpsiOptionalStatusIcon);
 
@@ -409,23 +412,24 @@ HRESULT CSampleCredential::GetSerialization(
 		PWSTR pwzProtectedPassword;
 
 		hr = ProtectIfNecessaryAndCopyPassword(_rgFieldStrings[SFI_PASSWORD], _cpus, &pwzProtectedPassword);
-
+		LOG_DEBUG << "in func GetSerialization first if";
 		if (SUCCEEDED(hr))
 		{
 			KERB_INTERACTIVE_UNLOCK_LOGON kiul;
 
 			// Initialize kiul with weak references to our credential.
 			hr = KerbInteractiveUnlockLogonInit(wsz, _rgFieldStrings[SFI_USERNAME], pwzProtectedPassword, _cpus, &kiul);
-
+			LOG_DEBUG << "in func GetSerialization second if";
 			if (SUCCEEDED(hr))
 			{
 				// We use KERB_INTERACTIVE_UNLOCK_LOGON in both unlock and logon scenarios.  It contains a
 				// KERB_INTERACTIVE_LOGON to hold the creds plus a LUID that is filled in for us by Winlogon
 				// as necessary.
 				hr = KerbInteractiveUnlockLogonPack(kiul, &pcpcs->rgbSerialization, &pcpcs->cbSerialization);
-
+				LOG_DEBUG << "in func GetSerialization third if";
 				if (SUCCEEDED(hr))
 				{
+					LOG_DEBUG << "in func GetSerialization fourth if";
 					ULONG ulAuthPackage;
 					hr = RetrieveNegotiateAuthPackage(&ulAuthPackage);
 					if (SUCCEEDED(hr))
@@ -438,6 +442,7 @@ HRESULT CSampleCredential::GetSerialization(
 						// that we have all the information we need and it should attempt to submit the 
 						// serialized credential.
 						*pcpgsr = CPGSR_RETURN_CREDENTIAL_FINISHED;
+						LOG_DEBUG << "in func GetSerialization last if";
 					}
 				}
 			}
@@ -450,7 +455,7 @@ HRESULT CSampleCredential::GetSerialization(
 		DWORD dwErr = GetLastError();
 		hr = HRESULT_FROM_WIN32(dwErr);
 	}
-
+	LOG_DEBUG << "in func GetSerialization finish";
 	return hr;
 }
 struct REPORT_RESULT_STATUS_INFO
@@ -507,6 +512,12 @@ HRESULT CSampleCredential::ReportResult(
 		if (_pCredProvCredentialEvents)
 		{
 			_pCredProvCredentialEvents->SetFieldString(this, SFI_PASSWORD, L"");
+			_pCredProvCredentialEvents->SetFieldString(this, SFI_USERNAME, L"");
+
+			incorrectCreds = true;
+			//*ppwszOptionalStatusText = NULL;
+			//*pcpsiOptionalStatusIcon = CPSI_NONE;
+			LOG_DEBUG << "in report result incorrectCreds=" << incorrectCreds;
 		}
 	}
 
