@@ -2,6 +2,7 @@ package ru.startandroid.androidclient;
 
 import android.os.AsyncTask;
 import android.os.Looper;
+import android.security.keystore.KeyProperties;
 import android.support.design.widget.TextInputLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -17,15 +18,23 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.security.AlgorithmParameters;
 import java.security.Key;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.SecureRandom;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.BitSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -34,157 +43,209 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
     }
-
+    byte[] cryptdata=null;
     String serIpAddress;       // адрес сервера
     String username;
     String password;
-    int port = 27015;           // порт
     String msg;                 // Сообщение
-    final byte codeMsg = 1;     // Оправить сообщение
-    final byte codeRotate = 2;  // Повернуть экран
-    final byte codePoff = 3;    // Выключить компьютер
-    byte codeCommand;
+    String code;
+
     EditText ipEdit, unEdit;
     TextInputLayout pwEdit;
     Button authorization;
     public void MyonClick(View view)
     {
+        String incorrectData="";
         ipEdit=(EditText)findViewById(R.id.editText5);
         serIpAddress = ipEdit.getText().toString();
 
-        if (serIpAddress.isEmpty())
-        {
-            Toast msgToast = Toast.makeText(this, "Введите ip адрес", Toast.LENGTH_SHORT);
-            msgToast.show();
-            return;
-        }
-        Pattern p=Pattern.compile("([0-9]{1,3}\\.){3}[0-9]{1,3}");
-        Matcher m=p.matcher(serIpAddress);
-        if(!m.matches())
-        {
-            Toast msgToast = Toast.makeText(this, "Некорректный ip адрес", Toast.LENGTH_SHORT);
-            msgToast.show();
-            return;
-        }
         unEdit=(EditText)findViewById(R.id.editText6);
         username=unEdit.getText().toString();
-        if(username.isEmpty())
-        {
-            Toast msgToast = Toast.makeText(getApplicationContext(), "Введите username", Toast.LENGTH_SHORT);
-            msgToast.show();
-            return;
-        }
 
         pwEdit=(TextInputLayout)findViewById(R.id.textInputLayout);
         password=pwEdit.getEditText().getText().toString();
-        if(password.isEmpty())
+
+        int i=0,num,count;
+        boolean flag=false;
+        Toast msgToast;
+        if (serIpAddress.isEmpty())
         {
-            Toast msgToast = Toast.makeText(this, "Введите password", Toast.LENGTH_SHORT);
+           incorrectData="Введите ip адрес";
+        }
+        Pattern p=Pattern.compile("([0-9]{1,3}\\.){3}[0-9]{1,3}");
+        String [] splits=serIpAddress.split("\\.");
+        count=splits.length-1;
+        while(!flag&&i<splits.length)
+        {
+            num=Integer.parseInt(splits[i]);
+            if(num>256)
+                flag=true;
+            ++i;
+        }
+        Matcher m=p.matcher(serIpAddress);
+
+        if(!m.matches()&&!flag)
+            incorrectData="Неверный формат ip адреса";
+
+        Pattern p1=Pattern.compile("((.*[\\(\\;\\:\\[\\]\\'\\(\\)\\/\\,\\+\\*\\?\\<\\>\\)]+))");
+        Matcher m1=p1.matcher(username);
+
+        if(incorrectData.isEmpty())
+        {
+            if (username.isEmpty())
+                incorrectData="Введите username";
+            if(username.length()>20)
+                incorrectData="Слишком длинное имя";
+            if(m1.lookingAt())
+                incorrectData="Неверный формат логина";
+
+        }
+
+        m1=p1.matcher(password);
+       if(incorrectData.isEmpty()) {
+           if (password.isEmpty())
+               incorrectData="Введите password";
+           if(password.length()>128)
+               incorrectData="Слишком длинный пароль";
+           if(m1.lookingAt())
+               incorrectData="Неверный формат пароль";
+       }
+       msg=username+"&"+password;
+        if(!incorrectData.isEmpty())
+        {
+            msgToast = Toast.makeText(this, incorrectData, Toast.LENGTH_LONG);
             msgToast.show();
             return;
         }
 
-        msg=username+"&"+password+"\0";
 
+        cryptdata=CryptingData(msg);
+        String beforeCryp=String.valueOf(msg.length());
         SenderThread sender = new SenderThread(); // объект представляющий поток отправки сообщений
-        switch (view.getId()) // id кнопок
-        {
-            case R.id.button: // отправить сообщение
-                if (!msg.isEmpty()) {
-                    codeCommand = codeMsg;
-                    sender.execute();
-                }
-                break;
-
-        }
-       // CripingData(msg);
+        sender.execute(msg,serIpAddress,beforeCryp);
     }
 
-    public void CripingData(String text)
+    public byte[] CryptingData(String text)
     {
         // Original text
         String theTestText = text;
 
         Toast msgToast;
-        // Generate key pair for 1024-bit RSA encryption and decryption
-        Key publicKey = null;
-        Key privateKey = null;
+
+        SecretKeySpec sks = null;
         try {
-            KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-            kpg.initialize(1024);
-            KeyPair kp = kpg.genKeyPair();
-            publicKey = kp.getPublic();
-            privateKey = kp.getPrivate();
+
+            sks = new SecretKeySpec("passworddrowssap".getBytes(), "AES");
         } catch (Exception e) {
-             msgToast = Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT);
+            msgToast = Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT);
             msgToast.show();
         }
 
-        // Encode the original data with RSA private key
+        // Encode the original data with AES
         byte[] encodedBytes = null;
         try {
-            Cipher c = Cipher.getInstance("RSA");
-            c.init(Cipher.ENCRYPT_MODE, publicKey);
-            encodedBytes = c.doFinal(theTestText.getBytes());
+
+            Cipher c = Cipher.getInstance("AES");
+            c.init(Cipher.ENCRYPT_MODE, sks);
+            encodedBytes = c.doFinal(theTestText.getBytes("UTF8"));
         } catch (Exception e) {
-             msgToast = Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT);
+            msgToast = Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT);
             msgToast.show();
         }
-         msgToast = Toast.makeText(this, "[ENCODED]:\n" +
-                Base64.encodeToString(encodedBytes, Base64.DEFAULT), Toast.LENGTH_SHORT);
+        msgToast = Toast.makeText(this, "[ENCODED]:\n" +
+              Base64.encodeToString(encodedBytes, Base64.DEFAULT), Toast.LENGTH_SHORT);
         msgToast.show();
-
-        // Decode the encoded data with RSA public key
-        byte[] decodedBytes = null;
-        try {
-            Cipher c = Cipher.getInstance("RSA");
-            c.init(Cipher.DECRYPT_MODE, privateKey);
-            decodedBytes = c.doFinal(encodedBytes);
-        } catch (Exception e) {
-             msgToast = Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT);
-            msgToast.show();
-        }
-        msgToast = Toast.makeText(this, "[DECODED]:\n" + new String(decodedBytes), Toast.LENGTH_SHORT);
-        msgToast.show();
-
+        return  encodedBytes;
     }
 
-    class SenderThread extends AsyncTask<Void, String, Void>
+    class SenderThread extends AsyncTask<String, String, Void>
     {
+        private int port = 27015;
         @Override
-        protected Void doInBackground(Void... params) {
+        protected Void doInBackground(String... params) {
             Toast msgToast=null;
+            String outtext=null;
+            String outipAddress=null;
+            String tmp=null;
+            int beforeCr=0;
+            if(params.length==3) {
+                outtext = params[0];
+                outipAddress=params[1];
+                beforeCr=Integer.parseInt(params[2]);
+            }
             try {
+                int i=1;
+                String str;
+                PMessage pMessage=new PMessage();
+                PMessage1 pMessage1=new PMessage1();
                 // ip адрес сервера
-                InetAddress ipAddress = InetAddress.getByName(serIpAddress);
+                InetAddress ipAddress = InetAddress.getByName(outipAddress);
                 // Создаем сокет
 
-                    Socket socket = new Socket(ipAddress, port);
+                Socket socket = new Socket(ipAddress, port);
                 // Получаем потоки ввод/вывода
                 OutputStream outputStream = socket.getOutputStream();
                 InputStream inputStream= socket.getInputStream();
                 DataOutputStream out = new DataOutputStream(outputStream);
                 DataInputStream in=new DataInputStream(inputStream);
-                switch (codeCommand) { // В зависимости от кода команды посылаем сообщения
-                    case codeMsg:	// Сообщение
-                        // Устанавливаем кодировку символов UTF-8
-                        byte[] outMsg = msg.getBytes("UTF8");
-                        out.write(outMsg);
-                        break;
-                }
 
-                String answer;
-                byte[] buffer = new byte[1024*4];
-                int count;
+                boolean finish=false;
                 do {
+                    byte[] outMsg = null;
+                    switch (i) {
+                        case 1:
+                            str = "1";
+                            outMsg = str.getBytes("UTF8");
+                            out.write(outMsg);
+                            break;
+
+                        case 2:
+                            str="4";
+                            if(outtext.length()<10)
+                                str += "00";
+                            if(outtext.length()<100&&outtext.length()>=10)
+                                str+="0";
+                            str+=outtext.length();
+                            if(beforeCr<10)
+                                str+="00";
+                            if(beforeCr<100&&beforeCr>=10)
+                                str+="0";
+                            str+=beforeCr+outtext;
+                            outMsg = str.getBytes("UTF8");
+                            out.write(outMsg);
+                            break;
+                    }
+                    String answer;
+                    byte[] buffer = new byte[1024 * 4];
+                    int count;
                     count = in.read(buffer, 0, buffer.length);
                     if (count > 0) {
-                        System.out.println(new String(buffer, 0, count));
-                        answer = new String(buffer, 0, count);
-                        publishProgress(answer);
+                            SetClassFileds(count,buffer,pMessage,pMessage1);
+
+                        switch (pMessage.GetID()) {
+                            case 2:
+                                answer = pMessage1.GetData();
+                                publishProgress(answer);
+                                finish=true;
+                                break;
+                            case 3:
+                                i = 2;
+                                answer = "Sending credentials";
+                                publishProgress(answer);
+                                break;
+                            case 5:
+                                answer = "Incorrect login or password.\n Try again";
+                                publishProgress(answer);
+                                break;
+                            case 6:
+                                answer = "Login is successful";
+                                finish=true;
+                                publishProgress(answer);
+                                break;
+                        }
 
                     }
-                }while(count>0);
+                }while(!finish);
                 socket.close();
             }
             catch (Exception ex)
@@ -198,8 +259,24 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onProgressUpdate(String ... m) {
             super.onProgressUpdate(m);
-            Toast msgToast = Toast.makeText( getApplicationContext(), m[0], Toast.LENGTH_SHORT);
+
+            Toast  msgToast = Toast.makeText(getApplicationContext(), m[0], Toast.LENGTH_LONG);
             msgToast.show();
+        }
+
+        private void SetClassFileds(int size,byte[] text, PMessage pMes,PMessage1 pMes1)
+        {
+            if(size>7)
+            {
+                pMes1.SetLenMessage(Integer.parseInt(new String(text, 1, 3)));
+                pMes1.SetLenData(Integer.parseInt(new String(text,4,3)));
+                if(size==7+pMes1.GetLenMessage())
+                    pMes1.SetData(new String(text, 7, pMes1.GetLenMessage()));
+                else
+                    pMes1.SetData("При приеме сообщения возникли какие-то ошибки");
+            }
+
+            pMes.SetID(Integer.parseInt(new String(text,0,1)));
         }
     }
 
