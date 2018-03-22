@@ -38,7 +38,7 @@ CSampleProvider::CSampleProvider() :
 	_pMessageCredential = NULL;
 	_UserName = NULL;
 	_Password = NULL;
-
+	//myevent = CreateEvent(NULL, TRUE, TRUE, L"event_result");
 }
 
 CSampleProvider::~CSampleProvider()
@@ -91,7 +91,7 @@ HRESULT CSampleProvider::SetUsageScenario(
 	UNREFERENCED_PARAMETER(dwFlags);
 	HRESULT hr;
 	LOG_DEBUG << "Start in SetUsageScenario";
-	
+	//HANDLE mut;
 	// Decide which scenarios to support here. Returning E_NOTIMPL simply tells the caller
 	// that we're not designed for that scenario.
 	switch (cpus)
@@ -112,6 +112,10 @@ HRESULT CSampleProvider::SetUsageScenario(
 			// For the locked case, a more advanced credprov might only enumerate tiles for the 
 			// user whose owns the locked session, since those are the only creds that will work
 			_pCredential = new CSampleCredential();
+			_pCredential->SetMutex();
+			//_pCredential->mutex = CreateMutex(NULL, TRUE, L"my_mutex");
+			
+			LOG_DEBUG << "after create mutex in provider";
 			if (_pCredential != NULL)
 			{
 				_pMessageCredential = new CMessageCredential();

@@ -91,6 +91,4 @@ private:
 	// re-enumerate credentials.
 	CREDENTIAL_PROVIDER_USAGE_SCENARIO      _cpus;
 	CSampleCredential           *_pCredential;          // Our "connected" credential.
-
-	
 };

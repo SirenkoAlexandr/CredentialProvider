@@ -30,6 +30,7 @@ CSampleCredential::CSampleCredential() :
 	ZeroMemory(_rgFieldStatePairs, sizeof(_rgFieldStatePairs));
 	ZeroMemory(_rgFieldStrings, sizeof(_rgFieldStrings));
 	incorrectCreds = false;
+
 }
 
 CSampleCredential::~CSampleCredential()
@@ -45,7 +46,11 @@ CSampleCredential::~CSampleCredential()
 		CoTaskMemFree(_rgFieldStrings[i]);
 		CoTaskMemFree(_rgCredProvFieldDescriptors[i].pszLabel);
 	}
-	
+	if (StatusText)
+	{
+		delete StatusText;
+		delete StatusIcon;
+	}
 	DllRelease();
 	LOG_DEBUG << "Finish in ~CSampleCredential ";
 }
@@ -96,7 +101,6 @@ HRESULT CSampleCredential::InitCred(
 	__in const CREDENTIAL_PROVIDER_FIELD_DESCRIPTOR* rgcpfd,
 	__in const FIELD_STATE_PAIR* rgfsp , wchar_t* UN,wchar_t* PW)
 {
-
 	HRESULT hr = S_OK;
 	_cpus = cpus;
 	incorrectCreds = false;
@@ -109,15 +113,14 @@ HRESULT CSampleCredential::InitCred(
 	}
 	LOG_DEBUG << "Start in InitCred";
 	LOG_DEBUG << "Username=" << UN << " Password=" << PW;
-	//HRESULT hr = S_OK;
 	// Initialize the String value of all the fields.
 	if (SUCCEEDED(hr))
-	{// USERNAME SetUsername
+	{
 		hr = SHStrDupW(UN, &_rgFieldStrings[SFI_USERNAME]);
 		LOG_DEBUG << "_rgFieldStrings[SFI_USERNAME]=" << _rgFieldStrings[SFI_USERNAME];
 	}
 	if (SUCCEEDED(hr))
-	{// PASSWORD SetPassword
+	{
 		hr = SHStrDupW(PW, &_rgFieldStrings[SFI_PASSWORD]);
 		LOG_DEBUG << " _rgFieldStrings[SFI_PASSWORD]=" << _rgFieldStrings[SFI_PASSWORD];
 	}
@@ -515,13 +518,43 @@ HRESULT CSampleCredential::ReportResult(
 			_pCredProvCredentialEvents->SetFieldString(this, SFI_USERNAME, L"");
 
 			incorrectCreds = true;
-			//*ppwszOptionalStatusText = NULL;
-			//*pcpsiOptionalStatusIcon = CPSI_NONE;
+			ReleaseMutex(mutex);
+			LOG_DEBUG << "after release mutex in credential";
+			SetErrorWindow(ppwszOptionalStatusText, pcpsiOptionalStatusIcon);
 			LOG_DEBUG << "in report result incorrectCreds=" << incorrectCreds;
 		}
 	}
-
+	
+	LOG_DEBUG << "in report result finish";
+	
 	// Since NULL is a valid value for *ppwszOptionalStatusText and *pcpsiOptionalStatusIcon
 	// this function can't fail.
 	return S_OK;
+}
+
+void CSampleCredential::SetErrorWindow(PWSTR* ppwszOptionalStatusText1,
+	 CREDENTIAL_PROVIDER_STATUS_ICON* pcpsiOptionalStatusIcon1)
+{
+	this->StatusText = ppwszOptionalStatusText1;
+	this->StatusIcon = pcpsiOptionalStatusIcon1;
+}
+
+void CSampleCredential::CloseErrorWindow()
+{
+	*StatusText = NULL;
+	*StatusIcon = CPSI_NONE;
+}
+
+
+bool CSampleCredential::GetIncorrectCreds()
+{
+	return this->incorrectCreds;
+}
+HANDLE CSampleCredential::GetMutex()
+{
+	return this->mutex;
+}
+void CSampleCredential::SetMutex()
+{
+	this->mutex = CreateMutex(NULL, TRUE, L"my_mutex");
 }
