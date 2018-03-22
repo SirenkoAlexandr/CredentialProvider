@@ -16,6 +16,7 @@ HANDLE					hThreadServer = NULL;
 
 VOID SvcInstall(void);
 VOID SvcDelete();
+VOID SvcStop();
 VOID SvcStart();
 VOID WINAPI SvcCtrlHandler(DWORD);
 VOID WINAPI SvcMain(DWORD, LPTSTR *);
@@ -46,6 +47,11 @@ void __cdecl _tmain(int argc, TCHAR *argv[])
 		SvcInstall();
 		return;
 	}
+	if (lstrcmpi(argv[1], TEXT("stop")) == 0)
+	{
+		SvcStop();
+		return;
+	}
 	if (lstrcmpi(argv[1], TEXT("delete")) == 0)
 	{
 		SvcDelete();
@@ -56,7 +62,7 @@ void __cdecl _tmain(int argc, TCHAR *argv[])
 		SvcStart();
 		return;
 	}
-
+	// run server in new thread
 	hThreadServer = CreateThread(NULL, 0, server, NULL, 0, NULL);
 	// TO_DO: Add any additional services for the process to this table.
 	SERVICE_TABLE_ENTRY DispatchTable[] =
@@ -96,8 +102,8 @@ VOID SvcInstall()
 		printf("Cannot install service (%d)\n", GetLastError());
 		return;
 	}
-	// Get a handle to the SCM database. 
 
+	// Get a handle to the SCM database. 
 	schSCManager = OpenSCManager(
 		NULL,                    // local computer
 		NULL,                    // ServicesActive database 
@@ -154,7 +160,6 @@ VOID SvcDelete()
 	SC_HANDLE hService;
 
 	// Get a handle to the SCM database. 
-
 	schSCManager = OpenSCManager(
 		NULL,                    // local computer
 		NULL,                    // ServicesActive database 
@@ -173,16 +178,46 @@ VOID SvcDelete()
 		CloseServiceHandle(schSCManager);
 		return;
 	}
-	ReportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 1000);
-	SetEvent(ghSvcStopEvent);;
-	if(DeleteService(hService))
+	if(!DeleteService(hService))
 		printf("Can't remove service!\n");
 	else
 		printf("Service removed successfully\n");
 	CloseServiceHandle(hService);
 	CloseServiceHandle(schSCManager);
+}
 
-	
+VOID SvcStop()
+{
+	printf("try stop Service\n");
+	SC_HANDLE schSCManager;
+	SC_HANDLE hService;
+
+	// Get a handle to the SCM database. 
+
+	schSCManager = OpenSCManager(
+		NULL,                    // local computer
+		NULL,                    // ServicesActive database 
+		SC_MANAGER_ALL_ACCESS);  // full access rights 
+
+	if (NULL == schSCManager)
+	{
+		printf("OpenSCManager failed (%d)\n", GetLastError());
+		return;
+	}
+
+	hService = OpenService(schSCManager, SVCNAME, SERVICE_STOP);
+
+	if (!hService) {
+		printf("Error: Can't stop service\n");
+		CloseServiceHandle(schSCManager);
+		return;
+	}
+
+	ReportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 1000);
+	SetEvent(ghSvcStopEvent);
+	ReportSvcStatus(gSvcStatus.dwCurrentState, NO_ERROR, 0);
+	CloseServiceHandle(hService);
+	CloseServiceHandle(schSCManager);
 }
 
 VOID SvcStart()
@@ -243,17 +278,13 @@ VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
 	}
 
 	// These SERVICE_STATUS members remain as set here
-
 	gSvcStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	gSvcStatus.dwServiceSpecificExitCode = 0;
 
 	// Report initial status to the SCM
-
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 3000);
 	
-	
 	// Perform service-specific initialization and work.
-
 	SvcInit(dwArgc, lpszArgv);
 }
 
@@ -293,12 +324,9 @@ VOID SvcInit(DWORD dwArgc, LPTSTR *lpszArgv)
 	}
 
 	// Report running status when initialization is complete.
-
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
 
 	// TO_DO: Perform work until service stops.
-
-
 	while (1)
 	{
 		// Check whether to stop the service.
@@ -328,8 +356,8 @@ VOID ReportSvcStatus(DWORD dwCurrentState,
 	DWORD dwWaitHint)
 {
 	static DWORD dwCheckPoint = 1;
-	if(hThreadServer==NULL)
-		hThreadServer = CreateThread(NULL, 0, server, NULL, 0, NULL);
+	/*if(hThreadServer==NULL)
+		hThreadServer = CreateThread(NULL, 0, server, NULL, 0, NULL);*/
 	// Fill in the SERVICE_STATUS structure.
 
 	gSvcStatus.dwCurrentState = dwCurrentState;
@@ -403,25 +431,13 @@ VOID SvcReportEvent(LPTSTR szFunction)
 	HANDLE hEventSource;
 	LPCTSTR lpszStrings[2];
 	TCHAR Buffer[80];
-
 	hEventSource = RegisterEventSource(NULL, SVCNAME);
-
 	if (NULL != hEventSource)
 	{
 		StringCchPrintf(Buffer, 80, TEXT("%s failed with %d"), szFunction, GetLastError());
 
 		lpszStrings[0] = SVCNAME;
 		lpszStrings[1] = Buffer;
-
-		//ReportEvent(hEventSource,        // event log handle
-		//	EVENTLOG_ERROR_TYPE, // event type
-		//	0,                   // event category
-		//	SVC_ERROR,           // event identifier
-		//	NULL,                // no security identifier
-		//	2,                   // size of lpszStrings array
-		//	0,                   // no binary data
-		//	lpszStrings,         // array of strings
-		//	NULL);               // no binary data
 
 		DeregisterEventSource(hEventSource);
 	}

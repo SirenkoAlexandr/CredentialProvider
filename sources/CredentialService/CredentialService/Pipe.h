@@ -5,21 +5,19 @@
 #include <tchar.h>
 #include"plog\Log.h"
 
-#define BUFSIZE 512
+#include"DefenitionConstants.h"
 
 int PipeMain(char *message)
 {
-	//char *message = (char*)Param;
+	LOG_DEBUG << "Start Pipe whith message : "<< message;
 	HANDLE hPipe;
 	LPTSTR lpvMessage =(LPTSTR)message;
-	TCHAR  chBuf[BUFSIZE];
+	wchar_t ProviderAnswer[128];
 	BOOL   fSuccess = FALSE;
 	DWORD  cbRead, cbToWrite, cbWritten, dwMode;
 	LPTSTR lpszPipename = TEXT("\\\\.\\pipe\\CredentialPipe");
-	//LPTSTR lpszPipename = TEXT("\\\\.\\pipe\\mynamedpipe");
 
 	// Try to open a named pipe; wait for it, if necessary. 
-
 	while (1)
 	{
 		hPipe = CreateFile(
@@ -42,7 +40,7 @@ int PipeMain(char *message)
 		if (GetLastError() != ERROR_PIPE_BUSY)
 		{
 			LOG_DEBUG << "Could not open pipe.";
-			return 0;
+			return PIPE_ERROR;
 		}
 
 		// All pipe instances are busy, so wait for 1 second. 
@@ -50,12 +48,11 @@ int PipeMain(char *message)
 		if (!WaitNamedPipe(lpszPipename, 2000))
 		{
 			LOG_DEBUG << "Could not open pipe: 2 second wait timed out.";
-			return 0;
+			return PIPE_ERROR;
 		}
 	}
 
 	// The pipe connected; change to message-read mode. 
-
 	dwMode = PIPE_READMODE_MESSAGE;
 	fSuccess = SetNamedPipeHandleState(
 		hPipe,    // pipe handle 
@@ -65,11 +62,10 @@ int PipeMain(char *message)
 	if (!fSuccess)
 	{
 		LOG_DEBUG << "SetNamedPipeHandleState failed.";
-		return 0;
+		return PIPE_ERROR;
 	}
 
 	// Send a message to the pipe server. 
-
 	cbToWrite = (lstrlen(lpvMessage) + 1) * sizeof(TCHAR);
 	LOG_DEBUG << "Sending message... ";
 
@@ -83,37 +79,46 @@ int PipeMain(char *message)
 	if (!fSuccess)
 	{
 		LOG_DEBUG << "WriteFile to pipe failed.";
-		return 0;
+		return PIPE_ERROR;
 	}
 
 	LOG_DEBUG << "Message "<< lpvMessage <<" sent to server. Simbols ="<< cbToWrite;
-
 	do
 	{
 		// Read from the pipe. 
-
 		fSuccess = ReadFile(
 			hPipe,    // pipe handle 
-			chBuf,    // buffer to receive reply 
+			ProviderAnswer,    // buffer to receive reply 
 			BUFSIZE * sizeof(TCHAR),  // size of buffer 
 			&cbRead,  // number of bytes read 
 			NULL);    // not overlapped 
-
 		if (!fSuccess && GetLastError() != ERROR_MORE_DATA)
 			break;
-
-		LOG_DEBUG << chBuf;
+		LOG_DEBUG << "message from credential :"<< ProviderAnswer <<". bites :"<< cbRead;
 	} while (!fSuccess);  // repeat loop if ERROR_MORE_DATA 
 
 	if (!fSuccess)
 	{
 		LOG_DEBUG << "ReadFile from pipe failed.";
-		return 0;
+		return PIPE_ERROR;
 	}
+	else
+	{
+		if (!wcscmp(ProviderAnswer, L"Fail"))
+		{
+			CloseHandle(hPipe);
+			LOG_DEBUG << "Wrong creds";
+			return WRONG_CREDS;
+		}
+		if (!wcscmp(ProviderAnswer, L"Success"))
+		{
+			CloseHandle(hPipe);
+			LOG_DEBUG << "good creds";
+			return GOOD_CREDS;
+		}
 
-	LOG_DEBUG << "Message sended";
-
+	}
 	CloseHandle(hPipe);
-	LOG_DEBUG << "Close Pipe";
-	return 1;
+	LOG_DEBUG << "something wrong";
+	return PIPE_ERROR;
 }
