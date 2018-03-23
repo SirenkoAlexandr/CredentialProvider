@@ -39,12 +39,16 @@
         android:id="@+id/button"
         android:layout_width="233dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="70dp"
-        android:text="Sign in"
+        android:layout_marginBottom="8dp"
+        android:layout_marginTop="8dp"
         android:onClick="MyonClick"
+        android:text="Sign in"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.503"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textInputLayout" />
+        app:layout_constraintTop_toBottomOf="@+id/textInputLayout"
+        app:layout_constraintVertical_bias="0.096" />
 
     <TextView
         android:id="@+id/textView4"
@@ -88,11 +92,12 @@
     <android.support.design.widget.TextInputLayout
         android:id="@+id/textInputLayout"
         android:layout_width="227dp"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="20dp"
+        android:layout_height="58dp"
+        android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="8dp"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toEndOf="@+id/textView6"
         app:layout_constraintTop_toBottomOf="@+id/editText6"
         app:passwordToggleEnabled="true">
