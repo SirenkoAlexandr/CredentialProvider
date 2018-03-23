@@ -74,6 +74,8 @@ public:
 	void OnConnectStatusChanged();
 	CREDENTIAL_PROVIDER_USAGE_SCENARIO GetCPUS();
 	CSampleCredential * GetPCredential();
+	wchar_t* _UserName;
+	wchar_t* _Password;
 protected:
 	CSampleProvider();
 	__override ~CSampleProvider();

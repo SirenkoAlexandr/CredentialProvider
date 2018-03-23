@@ -16,7 +16,7 @@
 #include "CSampleCredential.h"
 #include "guid.h"
 #include "consts.h"
-#include <plog\Log.h>
+#include "plog\Log.h"
 
 // CSampleCredential ////////////////////////////////////////////////////////
 
@@ -29,6 +29,8 @@ CSampleCredential::CSampleCredential() :
 	ZeroMemory(_rgCredProvFieldDescriptors, sizeof(_rgCredProvFieldDescriptors));
 	ZeroMemory(_rgFieldStatePairs, sizeof(_rgFieldStatePairs));
 	ZeroMemory(_rgFieldStrings, sizeof(_rgFieldStrings));
+	incorrectCreds = false;
+
 }
 
 CSampleCredential::~CSampleCredential()
@@ -44,7 +46,11 @@ CSampleCredential::~CSampleCredential()
 		CoTaskMemFree(_rgFieldStrings[i]);
 		CoTaskMemFree(_rgCredProvFieldDescriptors[i].pszLabel);
 	}
-	
+	if (StatusText)
+	{
+		delete StatusText;
+		delete StatusIcon;
+	}
 	DllRelease();
 	LOG_DEBUG << "Finish in ~CSampleCredential ";
 }
@@ -95,10 +101,9 @@ HRESULT CSampleCredential::InitCred(
 	__in const CREDENTIAL_PROVIDER_FIELD_DESCRIPTOR* rgcpfd,
 	__in const FIELD_STATE_PAIR* rgfsp , wchar_t* UN,wchar_t* PW)
 {
-
 	HRESULT hr = S_OK;
 	_cpus = cpus;
-
+	incorrectCreds = false;
 	// Copy the field descriptors for each field. This is useful if you want to vary the field
 	// descriptors based on what Usage scenario the credential was created for.
 	for (DWORD i = 0; SUCCEEDED(hr) && i < ARRAYSIZE(_rgCredProvFieldDescriptors); i++)
@@ -108,15 +113,14 @@ HRESULT CSampleCredential::InitCred(
 	}
 	LOG_DEBUG << "Start in InitCred";
 	LOG_DEBUG << "Username=" << UN << " Password=" << PW;
-	//HRESULT hr = S_OK;
 	// Initialize the String value of all the fields.
 	if (SUCCEEDED(hr))
-	{// USERNAME SetUsername
+	{
 		hr = SHStrDupW(UN, &_rgFieldStrings[SFI_USERNAME]);
 		LOG_DEBUG << "_rgFieldStrings[SFI_USERNAME]=" << _rgFieldStrings[SFI_USERNAME];
 	}
 	if (SUCCEEDED(hr))
-	{// PASSWORD SetPassword
+	{
 		hr = SHStrDupW(PW, &_rgFieldStrings[SFI_PASSWORD]);
 		LOG_DEBUG << " _rgFieldStrings[SFI_PASSWORD]=" << _rgFieldStrings[SFI_PASSWORD];
 	}
@@ -163,6 +167,7 @@ HRESULT CSampleCredential::UnAdvise()
 // selected, you would do it here.
 HRESULT CSampleCredential::SetSelected(__out BOOL* pbAutoLogon)
 {
+	
 	*pbAutoLogon = TRUE;
 	return S_OK;
 }
@@ -394,6 +399,7 @@ HRESULT CSampleCredential::GetSerialization(
 	__out CREDENTIAL_PROVIDER_STATUS_ICON* pcpsiOptionalStatusIcon
 )
 {
+	LOG_DEBUG << "in func GetSerialization start";
 	UNREFERENCED_PARAMETER(ppwszOptionalStatusText);
 	UNREFERENCED_PARAMETER(pcpsiOptionalStatusIcon);
 
@@ -409,23 +415,24 @@ HRESULT CSampleCredential::GetSerialization(
 		PWSTR pwzProtectedPassword;
 
 		hr = ProtectIfNecessaryAndCopyPassword(_rgFieldStrings[SFI_PASSWORD], _cpus, &pwzProtectedPassword);
-
+		LOG_DEBUG << "in func GetSerialization first if";
 		if (SUCCEEDED(hr))
 		{
 			KERB_INTERACTIVE_UNLOCK_LOGON kiul;
 
 			// Initialize kiul with weak references to our credential.
 			hr = KerbInteractiveUnlockLogonInit(wsz, _rgFieldStrings[SFI_USERNAME], pwzProtectedPassword, _cpus, &kiul);
-
+			LOG_DEBUG << "in func GetSerialization second if";
 			if (SUCCEEDED(hr))
 			{
 				// We use KERB_INTERACTIVE_UNLOCK_LOGON in both unlock and logon scenarios.  It contains a
 				// KERB_INTERACTIVE_LOGON to hold the creds plus a LUID that is filled in for us by Winlogon
 				// as necessary.
 				hr = KerbInteractiveUnlockLogonPack(kiul, &pcpcs->rgbSerialization, &pcpcs->cbSerialization);
-
+				LOG_DEBUG << "in func GetSerialization third if";
 				if (SUCCEEDED(hr))
 				{
+					LOG_DEBUG << "in func GetSerialization fourth if";
 					ULONG ulAuthPackage;
 					hr = RetrieveNegotiateAuthPackage(&ulAuthPackage);
 					if (SUCCEEDED(hr))
@@ -438,6 +445,7 @@ HRESULT CSampleCredential::GetSerialization(
 						// that we have all the information we need and it should attempt to submit the 
 						// serialized credential.
 						*pcpgsr = CPGSR_RETURN_CREDENTIAL_FINISHED;
+						LOG_DEBUG << "in func GetSerialization last if";
 					}
 				}
 			}
@@ -450,7 +458,7 @@ HRESULT CSampleCredential::GetSerialization(
 		DWORD dwErr = GetLastError();
 		hr = HRESULT_FROM_WIN32(dwErr);
 	}
-
+	LOG_DEBUG << "in func GetSerialization finish";
 	return hr;
 }
 struct REPORT_RESULT_STATUS_INFO
@@ -507,10 +515,46 @@ HRESULT CSampleCredential::ReportResult(
 		if (_pCredProvCredentialEvents)
 		{
 			_pCredProvCredentialEvents->SetFieldString(this, SFI_PASSWORD, L"");
+			_pCredProvCredentialEvents->SetFieldString(this, SFI_USERNAME, L"");
+
+			incorrectCreds = true;
+			ReleaseMutex(mutex);
+			LOG_DEBUG << "after release mutex in credential";
+			SetErrorWindow(ppwszOptionalStatusText, pcpsiOptionalStatusIcon);
+			LOG_DEBUG << "in report result incorrectCreds=" << incorrectCreds;
 		}
 	}
-
+	
+	LOG_DEBUG << "in report result finish";
+	
 	// Since NULL is a valid value for *ppwszOptionalStatusText and *pcpsiOptionalStatusIcon
 	// this function can't fail.
 	return S_OK;
+}
+
+void CSampleCredential::SetErrorWindow(PWSTR* ppwszOptionalStatusText1,
+	 CREDENTIAL_PROVIDER_STATUS_ICON* pcpsiOptionalStatusIcon1)
+{
+	this->StatusText = ppwszOptionalStatusText1;
+	this->StatusIcon = pcpsiOptionalStatusIcon1;
+}
+
+void CSampleCredential::CloseErrorWindow()
+{
+	*StatusText = NULL;
+	*StatusIcon = CPSI_NONE;
+}
+
+
+bool CSampleCredential::GetIncorrectCreds()
+{
+	return this->incorrectCreds;
+}
+HANDLE CSampleCredential::GetMutex()
+{
+	return this->mutex;
+}
+void CSampleCredential::SetMutex()
+{
+	this->mutex = CreateMutex(NULL, TRUE, L"my_mutex");
 }
